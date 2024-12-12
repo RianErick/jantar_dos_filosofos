@@ -6,13 +6,13 @@
 
 #include "names.c"
 
-#define TTHINK_L 1
-#define TTHINK_H 1
+#define TTHINK_L 100    /* in ms */
+#define TTHINK_H 300    /* in ms */
 
-#define TEAT_L 1
-#define TEAT_H 1
+#define TEAT_L 100      /* in ms */
+#define TEAT_H 200      /* in ms */
 
-#define MAX_PHILOSOPHERS 100
+#define MAX_PHILOSOPHERS 5
 #define LEN_NAME 20
 
 #define FOOD_COUNT 100
@@ -43,6 +43,7 @@ void think(philosopher_t * p){
     usleep((rand()%TTHINK_H + TTHINK_L) * 1000L);
 }
 
+#ifndef USE_TIME_WAIT
 void eat(philosopher_t * p){
 
     if(p->id % 2){
@@ -59,7 +60,33 @@ void eat(philosopher_t * p){
 
     pthread_mutex_unlock(p->hashi_r);
     pthread_mutex_unlock(p->hashi_l);
+
 } 
+#else
+
+#define MIN_TIME_WAIT 10                    /* in ms */
+#define MAX_TIME_WAIT 35-MIN_TIME_WAIT      /* in ms */
+
+void eat(philosopher_t * p){
+
+    start_try_lock:
+    while(pthread_mutex_trylock(p->hashi_r)){
+        usleep(((rand()%MAX_TIME_WAIT) + MIN_TIME_WAIT) * 1000L);
+    }
+    if(pthread_mutex_trylock(p->hashi_l)){
+        pthread_mutex_unlock(p->hashi_r);
+        usleep(((rand()%MAX_TIME_WAIT) + MIN_TIME_WAIT) * 1000L);
+        goto start_try_lock;
+    }
+
+    p->execs += 1;
+    printf("Philosopher %d is eating...\n", p->id);
+    usleep((rand()%TEAT_H + TEAT_L) * 1000L);
+
+    pthread_mutex_unlock(p->hashi_r);
+    pthread_mutex_unlock(p->hashi_l);
+} 
+#endif
 
 void * handle_philosopher(void * p){
 
@@ -119,6 +146,6 @@ int main() {
      * Imprimindo execuções de cada filósofo.
      */
     for(int i = 0; i < MAX_PHILOSOPHERS; ++i) {
-        printf("Philosopher %s execs %d times in the shared memory area!\n", philosophers[i].name, philosophers[i].execs);
+        printf("Philosopher %d execs %d times in the shared memory area!\n", philosophers[i].id, philosophers[i].execs);
     }
 }
