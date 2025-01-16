@@ -28,6 +28,7 @@ sem_t sem_readers;
 sem_t sem_writers;
 
 sem_t mutex_controller;
+sem_t mutex_controller_notify_first;
 
 int active_readers = 0;
 int active_writers = 0;
@@ -103,19 +104,21 @@ void * controller(){
             sem_wait(&mutex_controller);
 
         sem_getvalue(&sem_readers, &value);
-        if(value <= 0)
+        if(value <= 0){
             for(int i = 0; i < READER_BATCH; ++i){
                 sem_post(&sem_readers);
             }
+        }
 
         while(active_readers)
             sem_wait(&mutex_controller);
 
         sem_getvalue(&sem_writers, &value);
-        if(value <= 0 && active_writers == 0)
+        if(value <= 0 && active_writers == 0){
             for(int i = 0; i < WRITER_BATCH; ++i){
                 sem_post(&sem_writers);
             }
+        }
     }
     return NULL;
 }

@@ -5,61 +5,57 @@
 #include <stdlib.h>
 #include <time.h>
 
-/**
- * Problema 01: Um escritor permanecendo um tempo considerável
- * escrevendo, e leitores esperando tempo aleatório bem mais curto,
- * aumenta o processamento da cpu, tornando inviável caso haja muitos leitores.
- * 
- * Problema 02: Os leitores sofrem de starvation, a medida que o número de 
- * escritores se aproxima do número de leitores.
- */
-
-#define READERS 10
-#define WRITERS 5
+#define READERS 100
+#define WRITERS 10
 
 #define READER_MAX_TIME 300     /* in ms*/
 #define READER_WAIT_TIME 800    /* in ms*/
 
-#define WRITER_MAX_TIME 300     /* in ms*/    
-#define WRITER_WAIT_TIME 500    /* in ms*/       
+#define WRITER_MAX_TIME 400     /* in ms*/    
+#define WRITER_WAIT_TIME 200    /* in ms*/       
 
-#define READER_ITER -1
-#define WRITER_ITER -1
+#define READER_ITER 10
+#define WRITER_ITER 10
 
-sem_t mutex_ready;
 sem_t mutex_writer;
 sem_t mutex_reader;
+sem_t mutex_queue;
 int reading = 0;
 
 int writers_ready = 0;
 
 void read_data() {
 
-    while(writers_ready) usleep(rand()%35+10);
-
+    sem_wait(&mutex_queue);
     sem_wait(&mutex_reader);
+
     reading += 1;
+    if (reading == 1) {
+        sem_wait(&mutex_writer);
+    }
+
     sem_post(&mutex_reader);
+    sem_post(&mutex_queue);
     
     printf("Reading... %d\n", reading);
     usleep((rand()%READER_MAX_TIME+50) * 1000L);
 
     sem_wait(&mutex_reader);
     reading -= 1;
+    if (reading == 0) {
+        sem_post(&mutex_writer);
+    }
     sem_post(&mutex_reader);
 }
 
 void write_data() {
-    sem_wait(&mutex_ready);
-    writers_ready += 1;
-    sem_post(&mutex_ready);
-
-    while(reading) usleep(rand()%35+10);
-
+    sem_wait(&mutex_queue);
     sem_wait(&mutex_writer);
+
+    sem_post(&mutex_queue);
+
     printf("Writting...\n");
     usleep((rand()%WRITER_MAX_TIME) * 1000L);
-    writers_ready -= 1;
     sem_post(&mutex_writer);
 }
 
@@ -87,7 +83,7 @@ int main() {
 
     sem_init(&mutex_writer, 0, 1);
     sem_init(&mutex_reader, 0, 1);
-    sem_init(&mutex_ready, 0, 1);
+    sem_init(&mutex_queue, 0, 1);
 
     pthread_t reader_threads[READERS];
     pthread_t writer_threads[WRITERS];
